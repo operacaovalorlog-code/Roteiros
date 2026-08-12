@@ -1,0 +1,1079 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Acompanhamento de Roteiros — ValorLog</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.5.1" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js" crossorigin="anonymous"></script>
+<style>
+  :root {
+    --laranja: #E8590C;
+    --laranja-dark: #C44A08;
+    --laranja-light: #FF7A35;
+    --bg: #0D0D0D;
+    --bg2: #161616;
+    --bg3: #1E1E1E;
+    --bg4: #252525;
+    --border: #2E2E2E;
+    --text: #F0F0F0;
+    --text2: #A0A0A0;
+    --text3: #606060;
+    --confirmado: #22C55E;
+    --pendente: #FACC15;
+    --cancelado: #EF4444;
+    --andamento: #3B82F6;
+    --radius: 10px;
+    --gap: 14px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', system-ui, sans-serif; font-size: 14px; min-height: 100vh; }
+
+  /* HEADER */
+  .header {
+    background: var(--bg2);
+    border-bottom: 2px solid var(--laranja);
+    padding: 0 24px;
+    display: flex; align-items: center; justify-content: space-between;
+    height: 60px; position: sticky; top: 0; z-index: 100;
+  }
+  .header-left { display: flex; align-items: center; gap: 14px; }
+  .logo-box {
+    background: var(--laranja);
+    color: #fff; font-weight: 900; font-size: 13px;
+    padding: 4px 10px; border-radius: 4px; letter-spacing: 1px;
+  }
+  .header h1 { font-size: 16px; font-weight: 600; color: var(--text); }
+  .header h1 span { color: var(--laranja); }
+  .header-right { display: flex; align-items: center; gap: 10px; }
+  .badge-src {
+    font-size: 11px; background: var(--bg3); border: 1px solid var(--border);
+    padding: 3px 10px; border-radius: 20px; color: var(--text2);
+  }
+  .badge-src.ativo { border-color: var(--laranja); color: var(--laranja); }
+
+  /* UPLOAD ZONE */
+  .upload-section {
+    padding: 28px 24px;
+    display: flex; flex-direction: column; align-items: center; gap: 20px;
+  }
+  .upload-title { font-size: 18px; font-weight: 700; color: var(--text); }
+  .upload-title span { color: var(--laranja); }
+  .upload-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; width: 100%; max-width: 700px; }
+  .upload-card {
+    background: var(--bg2); border: 2px dashed var(--border);
+    border-radius: var(--radius); padding: 28px 20px;
+    text-align: center; cursor: pointer; transition: all .2s;
+    position: relative;
+  }
+  .upload-card:hover { border-color: var(--laranja); background: #1a1008; }
+  .upload-card.loaded { border-style: solid; border-color: var(--laranja); background: #1a1008; }
+  .upload-card input { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; }
+  .upload-icon { font-size: 32px; margin-bottom: 10px; }
+  .upload-label { font-size: 13px; font-weight: 700; color: var(--text); margin-bottom: 4px; }
+  .upload-sub { font-size: 11px; color: var(--text2); }
+  .upload-file-name { font-size: 11px; color: var(--laranja); margin-top: 6px; font-weight: 600; }
+  .btn-processar {
+    background: var(--laranja); color: #fff; font-weight: 700; font-size: 14px;
+    padding: 12px 36px; border: none; border-radius: 8px; cursor: pointer;
+    transition: background .2s; letter-spacing: .5px;
+  }
+  .btn-processar:hover { background: var(--laranja-dark); }
+  .btn-processar:disabled { background: var(--bg4); color: var(--text3); cursor: not-allowed; }
+
+  /* DASHBOARD */
+  .dashboard { display: none; padding: 20px 24px; }
+  .dashboard.visible { display: block; }
+
+  /* FILTROS */
+  .filter-bar {
+    background: var(--bg2); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 14px 18px;
+    display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
+    margin-bottom: var(--gap);
+  }
+  .filter-bar label { font-size: 11px; color: var(--text2); text-transform: uppercase; letter-spacing: .5px; }
+  .filter-bar select, .filter-bar input[type=date] {
+    background: var(--bg3); border: 1px solid var(--border);
+    color: var(--text); padding: 6px 12px; border-radius: 6px; font-size: 13px;
+    outline: none; cursor: pointer;
+  }
+  .filter-bar select:focus, .filter-bar input[type=date]:focus { border-color: var(--laranja); }
+  .filter-group { display: flex; flex-direction: column; gap: 4px; }
+  .btn-reset {
+    background: var(--bg3); border: 1px solid var(--border); color: var(--text2);
+    padding: 6px 14px; border-radius: 6px; cursor: pointer; font-size: 12px;
+    margin-left: auto; transition: all .15s;
+  }
+  .btn-reset:hover { border-color: var(--laranja); color: var(--laranja); }
+  .btn-nova-importacao {
+    background: transparent; border: 1px solid var(--laranja); color: var(--laranja);
+    padding: 6px 14px; border-radius: 6px; cursor: pointer; font-size: 12px; font-weight: 600;
+    transition: all .15s;
+  }
+  .btn-nova-importacao:hover { background: var(--laranja); color: #fff; }
+
+  /* KPIs */
+  .kpi-row { display: grid; grid-template-columns: repeat(5, 1fr); gap: var(--gap); margin-bottom: var(--gap); }
+  .kpi {
+    background: var(--bg2); border: 1px solid var(--border); border-radius: var(--radius);
+    padding: 16px 18px; position: relative; overflow: hidden;
+  }
+  .kpi::before {
+    content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px;
+    background: var(--kpi-color, var(--laranja));
+  }
+  .kpi-label { font-size: 11px; color: var(--text2); text-transform: uppercase; letter-spacing: .5px; margin-bottom: 8px; }
+  .kpi-val { font-size: 30px; font-weight: 800; color: var(--text); line-height: 1; }
+  .kpi-sub { font-size: 11px; color: var(--text2); margin-top: 6px; }
+  .kpi-icon { position: absolute; right: 14px; top: 14px; font-size: 22px; opacity: .15; }
+
+  /* CHARTS ROW */
+  .charts-row { display: grid; grid-template-columns: 1.6fr 1fr; gap: var(--gap); margin-bottom: var(--gap); }
+  .charts-row2 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: var(--gap); margin-bottom: var(--gap); }
+  .card {
+    background: var(--bg2); border: 1px solid var(--border); border-radius: var(--radius);
+    padding: 18px 20px;
+  }
+  .card-title {
+    font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .5px;
+    color: var(--text2); margin-bottom: 14px; display: flex; align-items: center; gap: 8px;
+  }
+  .card-title::before {
+    content: ''; width: 3px; height: 12px;
+    background: var(--laranja); border-radius: 2px; display: inline-block;
+  }
+  canvas { max-height: 260px; }
+
+  /* TABELA */
+  .table-wrap { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  thead th {
+    background: var(--bg3); color: var(--text2); font-size: 11px;
+    text-transform: uppercase; letter-spacing: .4px; padding: 10px 12px;
+    text-align: left; white-space: nowrap; border-bottom: 1px solid var(--border);
+    cursor: pointer; user-select: none; position: sticky; top: 0;
+  }
+  thead th:hover { color: var(--laranja); }
+  tbody tr { border-bottom: 1px solid var(--border); transition: background .1s; }
+  tbody tr:hover { background: var(--bg3); }
+  tbody td { padding: 9px 12px; white-space: nowrap; color: var(--text); }
+  .badge {
+    display: inline-block; padding: 2px 9px; border-radius: 20px;
+    font-size: 10px; font-weight: 700; letter-spacing: .4px;
+  }
+  .badge-confirmado { background: #14532d; color: var(--confirmado); }
+  .badge-pendente   { background: #422006; color: var(--pendente); }
+  .badge-cancelado  { background: #450a0a; color: var(--cancelado); }
+  .badge-andamento  { background: #1e3a5f; color: var(--andamento); }
+  .badge-outro      { background: var(--bg4); color: var(--text2); }
+
+  .dep-badge {
+    display: inline-block; padding: 1px 7px; border-radius: 4px;
+    font-size: 10px; font-weight: 700; background: var(--bg4); color: var(--laranja);
+    border: 1px solid var(--laranja);
+  }
+  .table-footer {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 10px 0 0; font-size: 11px; color: var(--text2);
+  }
+
+  /* HORA TIMELINE */
+  .timeline-bar-wrap {
+    display: flex; gap: 2px; align-items: center; margin-top: 4px;
+  }
+  .timeline-hour {
+    flex: 1; height: 24px; background: var(--bg4); border-radius: 3px;
+    position: relative; cursor: default;
+  }
+  .timeline-hour.has-data { background: var(--laranja); opacity: .7; }
+  .timeline-hour.has-data:hover { opacity: 1; }
+  .hour-labels {
+    display: flex; justify-content: space-between;
+    font-size: 9px; color: var(--text3); margin-top: 2px;
+  }
+
+  /* FONTE TAG */
+  .fonte-tag {
+    font-size: 10px; background: var(--bg3);
+    border: 1px solid var(--border); padding: 1px 7px;
+    border-radius: 20px; color: var(--text3);
+  }
+  .fonte-matriz { border-color: var(--laranja); color: var(--laranja); }
+  .fonte-filial  { border-color: var(--andamento); color: var(--andamento); }
+
+  .section-divider {
+    font-size: 11px; text-transform: uppercase; letter-spacing: .8px;
+    color: var(--text3); padding: 4px 0 10px; border-bottom: 1px solid var(--border);
+    margin-bottom: var(--gap);
+  }
+
+  .btn-export {
+    background: var(--bg3); border: 1px solid var(--border); color: var(--text);
+    padding: 6px 14px; border-radius: 6px; cursor: pointer; font-size: 12px;
+    font-weight: 600; transition: all .15s; white-space: nowrap;
+  }
+  .btn-export:hover { border-color: var(--confirmado); color: var(--confirmado); }
+  .btn-export-pdf:hover { border-color: var(--cancelado); color: var(--cancelado); }
+
+  /* PDF print styles */
+  @media print {
+    body { background: #fff !important; color: #000 !important; }
+    .header, .upload-section, .filter-bar { display: none !important; }
+    .dashboard { padding: 0 !important; }
+    .card, .kpi { background: #fff !important; border: 1px solid #ddd !important; box-shadow: none !important; }
+    .kpi-label, .card-title, .kpi-sub { color: #555 !important; }
+    .kpi-val, .kpi-icon { color: #000 !important; }
+    .kpi-row { display: grid !important; grid-template-columns: repeat(5,1fr) !important; }
+    .charts-row { display: grid !important; grid-template-columns: 1.6fr 1fr !important; }
+    .charts-row2 { display: grid !important; grid-template-columns: repeat(3,1fr) !important; }
+    tbody td, thead th { color: #000 !important; border-color: #ddd !important; }
+    .badge-confirmado { background: #d1fae5 !important; color: #065f46 !important; }
+    .badge-pendente   { background: #fef3c7 !important; color: #92400e !important; }
+    .badge-cancelado  { background: #fee2e2 !important; color: #991b1b !important; }
+    .fonte-tag { color: #555 !important; }
+    .dep-badge { color: #000 !important; }
+    .print-header { display: block !important; }
+    canvas { max-height: 200px !important; }
+  }
+  .print-header { display: none; }
+
+  @media (max-width: 900px) {
+    .kpi-row { grid-template-columns: repeat(3, 1fr); }
+    .charts-row { grid-template-columns: 1fr; }
+    .charts-row2 { grid-template-columns: 1fr; }
+    .upload-grid { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-left">
+    <div class="logo-box">VALORLOG</div>
+    <h1>Acompanhamento de <span>Roteiros</span></h1>
+  </div>
+  <div class="header-right">
+    <div class="badge-src" id="badge-matriz">📁 Matriz</div>
+    <div class="badge-src" id="badge-filial">📁 Filial</div>
+  </div>
+</div>
+
+<!-- UPLOAD -->
+<div class="upload-section" id="upload-section">
+  <div class="upload-title">Importar arquivos de <span>Roteiros</span></div>
+  <p style="color:var(--text2);font-size:13px;text-align:center">Selecione os dois arquivos XLS exportados do sistema. Matriz e Filial podem ser carregados juntos ou separados.</p>
+  <div class="upload-grid">
+    <div class="upload-card" id="card-matriz">
+      <input type="file" accept=".xls,.xlsx" id="file-matriz" onchange="handleFile(event,'matriz')">
+      <div class="upload-icon">🏭</div>
+      <div class="upload-label">Arquivo Matriz</div>
+      <div class="upload-sub">Roteiros da Matriz</div>
+      <div class="upload-file-name" id="name-matriz"></div>
+    </div>
+    <div class="upload-card" id="card-filial">
+      <input type="file" accept=".xls,.xlsx" id="file-filial" onchange="handleFile(event,'filial')">
+      <div class="upload-icon">🏢</div>
+      <div class="upload-label">Arquivo Filial</div>
+      <div class="upload-sub">Roteiros das Filiais</div>
+      <div class="upload-file-name" id="name-filial"></div>
+    </div>
+  </div>
+  <button class="btn-processar" id="btn-processar" disabled onclick="processar()">⚡ Gerar Dashboard</button>
+  <p style="color:var(--text3);font-size:11px">Basta carregar um dos arquivos para gerar o dashboard</p>
+</div>
+
+<!-- DASHBOARD -->
+<div class="dashboard" id="dashboard">
+
+  <div class="filter-bar">
+    <div class="filter-group">
+      <label>Ano</label>
+      <select id="f-ano" onchange="applyFilters()">
+        <option value="">Todos</option>
+      </select>
+    </div>
+    <div class="filter-group">
+      <label>Mês</label>
+      <select id="f-mes" onchange="applyFilters()">
+        <option value="">Todos</option>
+        <option value="01">Janeiro</option>
+        <option value="02">Fevereiro</option>
+        <option value="03">Março</option>
+        <option value="04">Abril</option>
+        <option value="05">Maio</option>
+        <option value="06">Junho</option>
+        <option value="07">Julho</option>
+        <option value="08">Agosto</option>
+        <option value="09">Setembro</option>
+        <option value="10">Outubro</option>
+        <option value="11">Novembro</option>
+        <option value="12">Dezembro</option>
+      </select>
+    </div>
+    <div class="filter-group">
+      <label>Data</label>
+      <input type="date" id="f-data" onchange="applyFilters()">
+    </div>
+    <div class="filter-group">
+      <label>Status</label>
+      <select id="f-status" onchange="applyFilters()">
+        <option value="">Todos</option>
+        <option value="Confirmado">Confirmado</option>
+        <option value="Pendente">Pendente</option>
+        <option value="Em Andamento">Em Andamento</option>
+        <option value="Cancelado">Cancelado</option>
+      </select>
+    </div>
+    <div class="filter-group">
+      <label>Depositante (Dep)</label>
+      <select id="f-dep" onchange="applyFilters()">
+        <option value="">Todos</option>
+      </select>
+    </div>
+    <div class="filter-group">
+      <label>Operador</label>
+      <select id="f-operador" onchange="applyFilters()">
+        <option value="">Todos</option>
+      </select>
+    </div>
+    <div class="filter-group">
+      <label>Fonte</label>
+      <select id="f-fonte" onchange="applyFilters()">
+        <option value="">Matriz + Filial</option>
+        <option value="MATRIZ">Apenas Matriz</option>
+        <option value="FILIAL">Apenas Filial</option>
+      </select>
+    </div>
+    <button class="btn-reset" onclick="resetFilters()">✕ Limpar</button>
+    <button class="btn-nova-importacao" onclick="novaImportacao()">↩ Nova Importação</button>
+    <div style="display:flex;gap:8px;margin-left:auto">
+      <button class="btn-export" onclick="exportarExcel()">📊 Excel</button>
+      <button class="btn-export btn-export-pdf" onclick="exportarPDF()">🖨️ PDF</button>
+    </div>
+  </div>
+
+  <!-- PRINT HEADER -->
+  <div class="print-header" style="margin-bottom:16px;padding-bottom:12px;border-bottom:2px solid #E8590C">
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:6px">
+      <div style="background:#E8590C;color:#fff;font-weight:900;font-size:13px;padding:4px 10px;border-radius:4px;letter-spacing:1px">VALORLOG</div>
+      <strong style="font-size:16px">Acompanhamento de Roteiros</strong>
+    </div>
+    <div id="print-info" style="font-size:12px;color:#555"></div>
+  </div>
+
+  <!-- KPIs -->
+  <div class="kpi-row">
+    <div class="kpi" style="--kpi-color:var(--laranja)">
+      <div class="kpi-icon">📋</div>
+      <div class="kpi-label">Total de Roteiros</div>
+      <div class="kpi-val" id="kpi-total">0</div>
+      <div class="kpi-sub" id="kpi-total-sub">—</div>
+    </div>
+    <div class="kpi" style="--kpi-color:var(--confirmado)">
+      <div class="kpi-icon">✅</div>
+      <div class="kpi-label">Confirmados</div>
+      <div class="kpi-val" id="kpi-conf">0</div>
+      <div class="kpi-sub" id="kpi-conf-pct">—</div>
+    </div>
+    <div class="kpi" style="--kpi-color:var(--pendente)">
+      <div class="kpi-icon">⏳</div>
+      <div class="kpi-label">Pendentes / Em And.</div>
+      <div class="kpi-val" id="kpi-pend">0</div>
+      <div class="kpi-sub" id="kpi-pend-pct">—</div>
+    </div>
+    <div class="kpi" style="--kpi-color:#A855F7">
+      <div class="kpi-icon">📦</div>
+      <div class="kpi-label">Total de Volumes</div>
+      <div class="kpi-val" id="kpi-vols">0</div>
+      <div class="kpi-sub">Volumes separados</div>
+    </div>
+    <div class="kpi" style="--kpi-color:var(--andamento)">
+      <div class="kpi-icon">👷</div>
+      <div class="kpi-label">Operadores Ativos</div>
+      <div class="kpi-val" id="kpi-ops">0</div>
+      <div class="kpi-sub" id="kpi-ops-sub">—</div>
+    </div>
+  </div>
+
+  <!-- CHARTS ROW 1 -->
+  <div class="charts-row">
+    <div class="card">
+      <div class="card-title">Roteiros Criados por Hora do Dia</div>
+      <canvas id="chart-hora"></canvas>
+    </div>
+    <div class="card">
+      <div class="card-title">Distribuição por Status</div>
+      <canvas id="chart-status"></canvas>
+    </div>
+  </div>
+
+  <!-- CHARTS ROW 2 -->
+  <div class="charts-row2">
+    <div class="card">
+      <div class="card-title">Roteiros por Operador</div>
+      <canvas id="chart-operador"></canvas>
+    </div>
+    <div class="card">
+      <div class="card-title">Roteiros por Depositante</div>
+      <canvas id="chart-dep"></canvas>
+    </div>
+    <div class="card">
+      <div class="card-title">Matriz vs Filial</div>
+      <canvas id="chart-fonte"></canvas>
+    </div>
+  </div>
+
+  <!-- TABELA -->
+  <div class="card">
+    <div class="card-title">Detalhamento de Roteiros</div>
+    <div class="table-wrap">
+      <table id="tabela">
+        <thead>
+          <tr>
+            <th onclick="sortTable('fonte')">Fonte</th>
+            <th onclick="sortTable('dep')">Dep</th>
+            <th onclick="sortTable('horaProc')">Hora Proc.</th>
+            <th onclick="sortTable('usuProc')">Operador</th>
+            <th onclick="sortTable('numRef')">Num. Ref</th>
+            <th onclick="sortTable('nFiscal')">NF</th>
+            <th onclick="sortTable('inicioSep')">Início Sep.</th>
+            <th onclick="sortTable('fimSep')">Fim Sep.</th>
+            <th onclick="sortTable('tEspera')" title="HoraProc → InícioSep" style="color:var(--andamento)">⏱ Espera</th>
+            <th onclick="sortTable('tSep')" title="InícioSep → FimSep" style="color:var(--laranja)">⏱ Sep.</th>
+            <th onclick="sortTable('inicioConf')">Início Conf.</th>
+            <th onclick="sortTable('fimConf')">Fim Conf.</th>
+            <th onclick="sortTable('tConf')" title="InícioConf → FimConf" style="color:#A855F7">⏱ Conf.</th>
+            <th onclick="sortTable('confirmacao')">Confirmação</th>
+            <th onclick="sortTable('tTotal')" title="HoraProc → Confirmação" style="color:var(--confirmado)">⏱ Total</th>
+            <th onclick="sortTable('sep')">Sep</th>
+            <th onclick="sortTable('qtde')">Qtde</th>
+            <th onclick="sortTable('vols')">Vols</th>
+            <th onclick="sortTable('ends')">Ends</th>
+            <th onclick="sortTable('status')">Status</th>
+          </tr>
+        </thead>
+        <tbody id="tbody"></tbody>
+      </table>
+    </div>
+    <div class="table-footer">
+      <span id="table-count">0 registros</span>
+      <span id="table-periodo" style="color:var(--text3)"></span>
+    </div>
+  </div>
+
+</div><!-- end dashboard -->
+
+<script>
+// ============================================================
+// ESTADO GLOBAL
+// ============================================================
+let rawData = [];          // todos os registros parseados
+let filtered = [];         // após filtros
+let sortKey = 'horaProc';
+let sortAsc = true;
+let charts = {};
+
+// ============================================================
+// LEITURA DE ARQUIVO
+// ============================================================
+let arquivos = { matriz: null, filial: null };
+
+function handleFile(e, tipo) {
+  const file = e.target.files[0];
+  if (!file) return;
+  arquivos[tipo] = file;
+  document.getElementById('name-' + tipo).textContent = file.name;
+  document.getElementById('card-' + tipo).classList.add('loaded');
+  document.getElementById('badge-' + tipo).classList.add('ativo');
+  document.getElementById('badge-' + tipo).textContent = (tipo === 'matriz' ? '✅ Matriz: ' : '✅ Filial: ') + file.name;
+  document.getElementById('btn-processar').disabled = false;
+}
+
+function processar() {
+  rawData = [];
+  const promises = [];
+  if (arquivos.matriz) promises.push(lerXLS(arquivos.matriz, 'MATRIZ'));
+  if (arquivos.filial)  promises.push(lerXLS(arquivos.filial,  'FILIAL'));
+
+  Promise.all(promises).then(() => {
+    if (rawData.length === 0) {
+      alert('Nenhum dado encontrado nos arquivos. Verifique se o formato está correto.');
+      return;
+    }
+    popularFiltros();
+    applyFilters();
+    document.getElementById('upload-section').style.display = 'none';
+    document.getElementById('dashboard').classList.add('visible');
+  }).catch(err => {
+    alert('Erro ao processar arquivo: ' + err.message);
+    console.error(err);
+  });
+}
+
+function lerXLS(file, fonte) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const wb = XLSX.read(e.target.result, { type: 'array', cellDates: true });
+        const ws = wb.Sheets[wb.SheetNames[0]];
+        const rows = XLSX.utils.sheet_to_json(ws, { header: 1, raw: false, dateNF: 'dd/mm/yy HH:MM' });
+
+        // Encontrar linha de cabeçalho (contém "Dep" e "HoraProc")
+        let headerIdx = -1;
+        for (let i = 0; i < rows.length; i++) {
+          const r = rows[i].map(c => String(c || '').trim());
+          if (r.includes('Dep') && r.some(c => c.includes('HoraProc') || c.includes('Hora'))) {
+            headerIdx = i;
+            break;
+          }
+        }
+        if (headerIdx === -1) { resolve(); return; }
+
+        const headers = rows[headerIdx].map(c => String(c || '').trim());
+        const idxOf = (name) => headers.findIndex(h => h.toLowerCase().includes(name.toLowerCase()));
+
+        const iDep     = idxOf('dep');
+        const iHora    = idxOf('horaproc');
+        const iUsup    = idxOf('usuproc');
+        const iIniSep  = idxOf('início') !== -1 ? idxOf('início') : idxOf('inicio');
+        const iFimSep  = headers.findIndex((h,i) => h.toLowerCase().includes('fimsep') || (h.toLowerCase().includes('fim') && i > iIniSep && i < iIniSep + 3));
+        const iSep     = headers.findIndex(h => h.trim() === 'Sep' || h.trim() === 'sep');
+        const iIniConf = headers.findIndex(h => h.toLowerCase().includes('inicioconf') || h.toLowerCase().includes('ínicioconf'));
+        const iFimConf = headers.findIndex(h => h.toLowerCase().includes('fimconf'));
+        const iConferente = idxOf('conferente');
+        const iQtde   = idxOf('qtde');
+        const iVols   = idxOf('vols');
+        const iEnds   = idxOf('ends');
+        const iNumRef = idxOf('numref');
+        const iNF     = idxOf('nfiscal');
+        const iTransp = idxOf('transp');
+        const iConf   = idxOf('confirmaç') !== -1 ? idxOf('confirmaç') : idxOf('confirmac');
+        const iStatus = idxOf('status');
+
+        for (let i = headerIdx + 2; i < rows.length; i++) {
+          const r = rows[i];
+          if (!r || !r[iDep] || String(r[iDep]).trim() === '') continue;
+          const dep = String(r[iDep] || '').trim();
+          if (!dep || dep === 'NaN') continue;
+
+          const horaProc = String(r[iHora] || '').trim();
+          if (!horaProc || horaProc === '-----' || horaProc === '') continue;
+
+          const confirmacao = iConf >= 0 ? String(r[iConf] || '-----').trim() : '-----';
+          // Status derivado SEMPRE pela coluna Confirmacao:
+          // se confirmacao tiver data = Confirmado, se ----- ou vazio = Pendente
+          const status = (!confirmacao || confirmacao === '-----' || confirmacao.trim() === '') ? 'Pendente' : 'Confirmado';
+
+          const inicioSep  = String(r[iIniSep]  || '-----').trim();
+          const fimSep     = iFimSep  >= 0 ? String(r[iFimSep]  || '-----').trim() : '-----';
+          const inicioConf = iIniConf >= 0 ? String(r[iIniConf] || '-----').trim() : '-----';
+          const fimConf    = iFimConf >= 0 ? String(r[iFimConf] || '-----').trim() : '-----';
+
+          // Calcular os 4 tempos em minutos
+          const tEspera = diffMin(horaProc, inicioSep);          // HoraProc → InícioSep
+          const tSep    = diffMin(inicioSep, fimSep);            // InícioSep → FimSep
+          const tConf   = diffMin(inicioConf, fimConf);          // InícioConf → FimConf
+          const tTotal  = diffMin(horaProc, confirmacao);        // HoraProc → Confirmação
+
+          rawData.push({
+            fonte,
+            dep,
+            horaProc,
+            usuProc:     String(r[iUsup] || '').trim(),
+            inicioSep,
+            fimSep,
+            sep:         iSep >= 0 ? String(r[iSep] || '-----').trim() : '-----',
+            inicioConf,
+            fimConf,
+            conferente:  iConferente >= 0 ? String(r[iConferente] || '-----').trim() : '-----',
+            qtde:        Number(String(r[iQtde] || '0').replace(/\D/g,'')) || 0,
+            vols:        Number(String(r[iVols] || '0').replace(/\D/g,'')) || 0,
+            ends:        Number(String(r[iEnds] || '0').replace(/\D/g,'')) || 0,
+            numRef:      String(r[iNumRef] || '').trim(),
+            nFiscal:     String(r[iNF] || '').trim(),
+            transp:      iTransp >= 0 ? String(r[iTransp] || '-----').trim() : '-----',
+            confirmacao,
+            status,
+            data:        extrairData(horaProc),
+            hora:        extrairHora(horaProc),
+            tEspera, tSep, tConf, tTotal,
+          });
+        }
+        resolve();
+      } catch(err) { reject(err); }
+    };
+    reader.onerror = () => reject(new Error('Falha na leitura do arquivo'));
+    reader.readAsArrayBuffer(file);
+  });
+}
+
+function extrairData(s) {
+  // Formatos: "24/07/26 10:03" ou "2026-07-24 ..."
+  if (!s || s === '-----') return '';
+  const m = s.match(/(\d{2})[\/\-](\d{2})[\/\-](\d{2,4})/);
+  if (!m) return '';
+  let [, a, b, c] = m;
+  if (c.length === 2) c = '20' + c;
+  return `${c}-${b}-${a}`;  // YYYY-MM-DD
+}
+
+function extrairHora(s) {
+  if (!s || s === '-----') return -1;
+  const m = s.match(/(\d{2}):(\d{2})/);
+  return m ? parseInt(m[1]) : -1;
+}
+
+// Calcula diferença em minutos entre duas strings de data/hora
+function diffMin(ini, fim) {
+  if (!ini || !fim || ini === '-----' || fim === '-----') return null;
+  const parse = (s) => {
+    // Formato: "24/07/26 10:03" ou "24/07/2026 10:03"
+    const m = s.match(/(\d{2})[\/\-](\d{2})[\/\-](\d{2,4})\s+(\d{2}):(\d{2})/);
+    if (!m) return null;
+    let [, d, mo, y, h, mi] = m;
+    if (y.length === 2) y = '20' + y;
+    return new Date(`${y}-${mo}-${d}T${h}:${mi}:00`);
+  };
+  const a = parse(ini), b = parse(fim);
+  if (!a || !b || isNaN(a) || isNaN(b)) return null;
+  const diff = Math.round((b - a) / 60000);
+  return diff < 0 ? null : diff;
+}
+
+// Formata minutos para "1h 23m" ou "45m"
+function fmtTempo(min) {
+  if (min === null || min === undefined) return '<span style="color:var(--text3)">—</span>';
+  if (min === 0) return '<span style="color:var(--text3)">0m</span>';
+  const h = Math.floor(min / 60);
+  const m = min % 60;
+  const val = h > 0 ? `${h}h ${m > 0 ? m+'m' : ''}` : `${m}m`;
+  // Cor por duração: verde < 30m, amarelo < 60m, laranja < 120m, vermelho >= 120m
+  const cor = min < 30 ? '#22C55E' : min < 60 ? '#FACC15' : min < 120 ? '#F97316' : '#EF4444';
+  return `<span style="color:${cor};font-weight:600">${val.trim()}</span>`;
+}
+
+function fmtTempoTexto(min) {
+  if (min === null || min === undefined) return '—';
+  if (min === 0) return '0m';
+  const h = Math.floor(min / 60);
+  const m = min % 60;
+  return h > 0 ? `${h}h ${m > 0 ? m+'m' : ''}`.trim() : `${m}m`;
+}
+
+// ============================================================
+// FILTROS
+// ============================================================
+function popularFiltros() {
+  // Anos
+  const anos = [...new Set(rawData.map(r => r.data ? r.data.substring(0,4) : '').filter(Boolean))].sort();
+  const fAno = document.getElementById('f-ano');
+  fAno.innerHTML = '<option value="">Todos</option>';
+  anos.forEach(a => fAno.innerHTML += `<option value="${a}">${a}</option>`);
+  // Selecionar ano mais recente por padrão
+  if (anos.length > 0) fAno.value = anos[anos.length - 1];
+
+  // Deps
+  const deps = [...new Set(rawData.map(r => r.dep))].sort();
+  const fDep = document.getElementById('f-dep');
+  fDep.innerHTML = '<option value="">Todos</option>';
+  deps.forEach(d => fDep.innerHTML += `<option value="${d}">Dep ${d}</option>`);
+
+  // Operadores
+  const ops = [...new Set(rawData.map(r => r.usuProc).filter(Boolean))].sort();
+  const fOp = document.getElementById('f-operador');
+  fOp.innerHTML = '<option value="">Todos</option>';
+  ops.forEach(o => fOp.innerHTML += `<option value="${o}">${o}</option>`);
+
+  // Mês padrão = mês mais recente
+  const datas = [...new Set(rawData.map(r => r.data).filter(Boolean))].sort();
+  if (datas.length > 0) {
+    const dataMaisRecente = datas[datas.length - 1];
+    document.getElementById('f-mes').value = dataMaisRecente.substring(5, 7);
+  }
+}
+
+function applyFilters() {
+  const fAno    = document.getElementById('f-ano').value;
+  const fMes    = document.getElementById('f-mes').value;
+  const fData   = document.getElementById('f-data').value;
+  const fStatus = document.getElementById('f-status').value;
+  const fDep    = document.getElementById('f-dep').value;
+  const fOp     = document.getElementById('f-operador').value;
+  const fFonte  = document.getElementById('f-fonte').value;
+
+  filtered = rawData.filter(r => {
+    if (fAno    && (!r.data || r.data.substring(0,4) !== fAno))  return false;
+    if (fMes    && (!r.data || r.data.substring(5,7) !== fMes))  return false;
+    if (fData   && r.data     !== fData)   return false;
+    if (fStatus && r.status   !== fStatus) return false;
+    if (fDep    && r.dep      !== fDep)    return false;
+    if (fOp     && r.usuProc  !== fOp)     return false;
+    if (fFonte  && r.fonte    !== fFonte)  return false;
+    return true;
+  });
+
+  renderKPIs();
+  renderCharts();
+  renderTabela();
+}
+
+function resetFilters() {
+  document.getElementById('f-ano').value = '';
+  document.getElementById('f-mes').value = '';
+  document.getElementById('f-data').value = '';
+  document.getElementById('f-status').value = '';
+  document.getElementById('f-dep').value = '';
+  document.getElementById('f-operador').value = '';
+  document.getElementById('f-fonte').value = '';
+  applyFilters();
+}
+
+function novaImportacao() {
+  document.getElementById('upload-section').style.display = '';
+  document.getElementById('dashboard').classList.remove('visible');
+}
+
+// ============================================================
+// KPIs
+// ============================================================
+function renderKPIs() {
+  const total = filtered.length;
+  const conf  = filtered.filter(r => r.status === 'Confirmado').length;
+  const pend  = filtered.filter(r => r.status !== 'Confirmado').length;
+  const vols  = filtered.reduce((s, r) => s + r.vols, 0);
+  const ops   = new Set(filtered.map(r => r.usuProc).filter(Boolean)).size;
+
+  document.getElementById('kpi-total').textContent = total;
+  document.getElementById('kpi-conf').textContent  = conf;
+  document.getElementById('kpi-pend').textContent  = pend;
+  document.getElementById('kpi-vols').textContent  = vols.toLocaleString('pt-BR');
+  document.getElementById('kpi-ops').textContent   = ops;
+
+  const pctConf = total ? Math.round(conf / total * 100) : 0;
+  document.getElementById('kpi-conf-pct').textContent  = `${pctConf}% do total`;
+  document.getElementById('kpi-pend-pct').textContent  = `${100 - pctConf}% do total`;
+
+  const matriz = filtered.filter(r => r.fonte === 'MATRIZ').length;
+  const filial = filtered.filter(r => r.fonte === 'FILIAL').length;
+  document.getElementById('kpi-total-sub').textContent = `Matriz: ${matriz} · Filial: ${filial}`;
+
+  const opList = [...new Set(filtered.map(r => r.usuProc).filter(Boolean))].join(', ');
+  document.getElementById('kpi-ops-sub').textContent = opList || '—';
+}
+
+// ============================================================
+// GRÁFICOS
+// ============================================================
+const LARANJA = '#E8590C';
+const CORES = ['#E8590C','#3B82F6','#22C55E','#A855F7','#FACC15','#EC4899','#14B8A6','#F97316'];
+
+function destroyChart(id) {
+  if (charts[id]) { charts[id].destroy(); delete charts[id]; }
+}
+
+function renderCharts() {
+  renderChartHora();
+  renderChartStatus();
+  renderChartOperador();
+  renderChartDep();
+  renderChartFonte();
+}
+
+function renderChartHora() {
+  destroyChart('hora');
+  const counts = Array(24).fill(0);
+  filtered.forEach(r => { if (r.hora >= 0) counts[r.hora]++; });
+  const labels = counts.map((_, i) => `${String(i).padStart(2,'0')}h`);
+  const ctx = document.getElementById('chart-hora').getContext('2d');
+  charts['hora'] = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [{
+        label: 'Roteiros',
+        data: counts,
+        backgroundColor: counts.map(v => v > 0 ? LARANJA + 'CC' : '#2E2E2E'),
+        borderColor:     counts.map(v => v > 0 ? LARANJA : '#2E2E2E'),
+        borderWidth: 1, borderRadius: 4,
+      }]
+    },
+    options: darkOpts({ title: 'Roteiros por hora' })
+  });
+}
+
+function renderChartStatus() {
+  destroyChart('status');
+  const statusMap = {};
+  filtered.forEach(r => { statusMap[r.status] = (statusMap[r.status] || 0) + 1; });
+  const labels = Object.keys(statusMap);
+  const data   = Object.values(statusMap);
+  const colorMap = {
+    'Confirmado': '#22C55E', 'Pendente': '#FACC15',
+    'Em Andamento': '#3B82F6', 'Cancelado': '#EF4444'
+  };
+  const bg = labels.map(l => colorMap[l] || '#888');
+  const ctx = document.getElementById('chart-status').getContext('2d');
+  charts['status'] = new Chart(ctx, {
+    type: 'doughnut',
+    data: { labels, datasets: [{ data, backgroundColor: bg, borderWidth: 2, borderColor: '#161616' }] },
+    options: {
+      ...darkOpts({}),
+      cutout: '65%',
+      plugins: {
+        legend: { position: 'bottom', labels: { color: '#A0A0A0', font: { size: 11 }, padding: 12 } },
+        tooltip: { callbacks: { label: (c) => ` ${c.label}: ${c.raw} (${Math.round(c.raw/filtered.length*100)}%)` } }
+      }
+    }
+  });
+}
+
+function renderChartOperador() {
+  destroyChart('operador');
+  const m = {};
+  filtered.forEach(r => { if (r.usuProc) m[r.usuProc] = (m[r.usuProc] || 0) + 1; });
+  const sorted = Object.entries(m).sort((a,b) => b[1]-a[1]);
+  const labels = sorted.map(e => e[0]);
+  const data   = sorted.map(e => e[1]);
+  const ctx = document.getElementById('chart-operador').getContext('2d');
+  charts['operador'] = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [{ label: 'Roteiros', data, backgroundColor: CORES, borderRadius: 4 }]
+    },
+    options: { ...darkOpts({}), indexAxis: 'y', plugins: { legend: { display: false } } }
+  });
+}
+
+function renderChartDep() {
+  destroyChart('dep');
+  const m = {};
+  filtered.forEach(r => { m[r.dep] = (m[r.dep] || 0) + 1; });
+  const sorted = Object.entries(m).sort((a,b) => b[1]-a[1]);
+  const ctx = document.getElementById('chart-dep').getContext('2d');
+  charts['dep'] = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: sorted.map(e => 'Dep ' + e[0]),
+      datasets: [{ label: 'Roteiros', data: sorted.map(e => e[1]),
+        backgroundColor: LARANJA + 'BB', borderRadius: 4 }]
+    },
+    options: { ...darkOpts({}), plugins: { legend: { display: false } } }
+  });
+}
+
+function renderChartFonte() {
+  destroyChart('fonte');
+  const matriz = filtered.filter(r => r.fonte === 'MATRIZ').length;
+  const filial  = filtered.filter(r => r.fonte === 'FILIAL').length;
+  const ctx = document.getElementById('chart-fonte').getContext('2d');
+  charts['fonte'] = new Chart(ctx, {
+    type: 'doughnut',
+    data: {
+      labels: ['Matriz', 'Filial'],
+      datasets: [{ data: [matriz, filial],
+        backgroundColor: [LARANJA, '#3B82F6'], borderWidth: 2, borderColor: '#161616' }]
+    },
+    options: {
+      ...darkOpts({}),
+      cutout: '60%',
+      plugins: {
+        legend: { position: 'bottom', labels: { color: '#A0A0A0', font: { size: 11 }, padding: 12 } }
+      }
+    }
+  });
+}
+
+function darkOpts(extra) {
+  return {
+    responsive: true,
+    animation: false,
+    plugins: {
+      legend: { display: false },
+      tooltip: { backgroundColor: '#252525', titleColor: '#F0F0F0', bodyColor: '#A0A0A0', borderColor: '#2E2E2E', borderWidth: 1 },
+      ...extra
+    },
+    scales: {
+      x: { ticks: { color: '#606060', font: { size: 10 } }, grid: { color: '#1E1E1E' } },
+      y: { ticks: { color: '#606060', font: { size: 10 } }, grid: { color: '#1E1E1E' } }
+    }
+  };
+}
+
+// ============================================================
+// TABELA
+// ============================================================
+function renderTabela() {
+  const data = [...filtered].sort((a, b) => {
+    let va = a[sortKey], vb = b[sortKey];
+    if (typeof va === 'string') va = va.toLowerCase();
+    if (typeof vb === 'string') vb = vb.toLowerCase();
+    return sortAsc ? (va > vb ? 1 : -1) : (va < vb ? 1 : -1);
+  });
+
+  const tbody = document.getElementById('tbody');
+  tbody.innerHTML = '';
+  data.forEach(r => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td><span class="fonte-tag fonte-${r.fonte.toLowerCase()}">${r.fonte}</span></td>
+      <td><span class="dep-badge">${r.dep}</span></td>
+      <td>${r.horaProc}</td>
+      <td>${r.usuProc || '—'}</td>
+      <td style="font-family:monospace">${r.numRef || '—'}</td>
+      <td style="font-family:monospace">${r.nFiscal || '—'}</td>
+      <td>${r.inicioSep}</td>
+      <td>${r.fimSep}</td>
+      <td style="text-align:center">${fmtTempo(r.tEspera)}</td>
+      <td style="text-align:center">${fmtTempo(r.tSep)}</td>
+      <td>${r.inicioConf}</td>
+      <td>${r.fimConf}</td>
+      <td style="text-align:center">${fmtTempo(r.tConf)}</td>
+      <td>${r.confirmacao}</td>
+      <td style="text-align:center">${fmtTempo(r.tTotal)}</td>
+      <td>${r.sep}</td>
+      <td style="text-align:right">${r.qtde.toLocaleString('pt-BR')}</td>
+      <td style="text-align:right">${r.vols}</td>
+      <td style="text-align:right">${r.ends}</td>
+      <td>${badgeStatus(r.status)}</td>
+    `;
+    tbody.appendChild(tr);
+  });
+
+  document.getElementById('table-count').textContent = `${data.length} roteiro${data.length !== 1 ? 's' : ''}`;
+  const datas = [...new Set(data.map(r => r.data).filter(Boolean))].sort();
+  if (datas.length > 0) {
+    const fmt = (s) => s ? s.split('-').reverse().join('/') : '';
+    document.getElementById('table-periodo').textContent =
+      datas.length === 1 ? `Data: ${fmt(datas[0])}` : `Período: ${fmt(datas[0])} a ${fmt(datas[datas.length-1])}`;
+  }
+}
+
+function badgeStatus(s) {
+  const map = {
+    'Confirmado':  'badge-confirmado',
+    'Pendente':    'badge-pendente',
+    'Cancelado':   'badge-cancelado',
+    'Em Andamento':'badge-andamento',
+  };
+  const cls = map[s] || 'badge-outro';
+  return `<span class="badge ${cls}">${s}</span>`;
+}
+
+function sortTable(key) {
+  if (sortKey === key) sortAsc = !sortAsc;
+  else { sortKey = key; sortAsc = true; }
+  renderTabela();
+}
+
+// ============================================================
+// EXPORTAÇÃO EXCEL
+// ============================================================
+function exportarExcel() {
+  if (!filtered.length) { alert('Nenhum dado para exportar.'); return; }
+
+  const wb = XLSX.utils.book_new();
+
+  // Aba: Detalhamento
+  const cabecalho = ['Fonte','Dep','Hora Proc.','Operador','Num. Ref','NF',
+    'Início Sep.','Fim Sep.','T.Espera','T.Separação','Início Conf.','Fim Conf.','T.Conferência','Confirmação','T.Total','Sep','Qtde','Vols','Ends','Status'];
+
+  const linhas = filtered.map(r => [
+    r.fonte, r.dep, r.horaProc, r.usuProc, r.numRef, r.nFiscal,
+    r.inicioSep, r.fimSep, fmtTempoTexto(r.tEspera), fmtTempoTexto(r.tSep),
+    r.inicioConf, r.fimConf, fmtTempoTexto(r.tConf),
+    r.confirmacao, fmtTempoTexto(r.tTotal),
+    r.sep, r.qtde, r.vols, r.ends, r.status
+  ]);
+
+  const wsDetalhe = XLSX.utils.aoa_to_sheet([cabecalho, ...linhas]);
+
+  // Larguras de coluna
+  wsDetalhe['!cols'] = [
+    {wch:8},{wch:6},{wch:16},{wch:12},{wch:12},{wch:14},
+    {wch:16},{wch:16},{wch:11},{wch:11},{wch:16},{wch:16},{wch:12},{wch:18},{wch:10},{wch:8},{wch:10},{wch:8},{wch:6},{wch:12}
+  ];
+
+  XLSX.utils.book_append_sheet(wb, wsDetalhe, 'Detalhamento');
+
+  // Aba: Resumo por Status
+  const statusCount = {};
+  filtered.forEach(r => { statusCount[r.status] = (statusCount[r.status] || 0) + 1; });
+  const wsResumo = XLSX.utils.aoa_to_sheet([
+    ['Status', 'Quantidade', '% do Total'],
+    ...Object.entries(statusCount).map(([s, c]) => [s, c, (c/filtered.length*100).toFixed(1)+'%']),
+    ['TOTAL', filtered.length, '100%']
+  ]);
+  wsResumo['!cols'] = [{wch:16},{wch:12},{wch:12}];
+  XLSX.utils.book_append_sheet(wb, wsResumo, 'Resumo por Status');
+
+  // Aba: Resumo por Operador
+  const opCount = {};
+  filtered.forEach(r => { if(r.usuProc) opCount[r.usuProc] = (opCount[r.usuProc] || 0) + 1; });
+  const wsOp = XLSX.utils.aoa_to_sheet([
+    ['Operador', 'Roteiros', 'Volumes'],
+    ...Object.entries(opCount)
+      .sort((a,b) => b[1]-a[1])
+      .map(([op, c]) => [
+        op, c,
+        filtered.filter(r => r.usuProc === op).reduce((s,r) => s+r.vols, 0)
+      ])
+  ]);
+  wsOp['!cols'] = [{wch:16},{wch:10},{wch:10}];
+  XLSX.utils.book_append_sheet(wb, wsOp, 'Por Operador');
+
+  // Aba: Resumo por Dep
+  const depCount = {};
+  filtered.forEach(r => { depCount[r.dep] = (depCount[r.dep] || 0) + 1; });
+  const wsDep = XLSX.utils.aoa_to_sheet([
+    ['Dep', 'Roteiros', 'Volumes'],
+    ...Object.entries(depCount)
+      .sort((a,b) => b[1]-a[1])
+      .map(([dep, c]) => [
+        'Dep '+dep, c,
+        filtered.filter(r => r.dep === dep).reduce((s,r) => s+r.vols, 0)
+      ])
+  ]);
+  wsDep['!cols'] = [{wch:10},{wch:10},{wch:10}];
+  XLSX.utils.book_append_sheet(wb, wsDep, 'Por Depositante');
+
+  // Nome do arquivo com período
+  const fAno = document.getElementById('f-ano').value || '';
+  const fMes = document.getElementById('f-mes').value || '';
+  const meses = ['','Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+  const periodo = fMes ? `${meses[parseInt(fMes)]}${fAno ? '_'+fAno : ''}` : (fAno || 'Todos');
+  XLSX.writeFile(wb, `Roteiros_${periodo}.xlsx`);
+}
+
+// ============================================================
+// EXPORTAÇÃO PDF (print)
+// ============================================================
+function exportarPDF() {
+  if (!filtered.length) { alert('Nenhum dado para exportar.'); return; }
+
+  // Preencher cabeçalho de impressão
+  const fAno = document.getElementById('f-ano').value || '';
+  const fMes = document.getElementById('f-mes').value || '';
+  const fData = document.getElementById('f-data').value || '';
+  const meses = ['','Janeiro','Fevereiro','Março','Abril','Maio','Junho',
+                 'Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+  const partes = [];
+  if (fMes) partes.push(meses[parseInt(fMes)]);
+  if (fAno) partes.push(fAno);
+  if (fData) partes.push(fData.split('-').reverse().join('/'));
+  const periodoStr = partes.length ? partes.join(' / ') : 'Todos os períodos';
+
+  document.getElementById('print-info').innerHTML =
+    `Período: <strong>${periodoStr}</strong> &nbsp;|&nbsp; ` +
+    `Total: <strong>${filtered.length} roteiros</strong> &nbsp;|&nbsp; ` +
+    `Confirmados: <strong>${filtered.filter(r=>r.status==='Confirmado').length}</strong> &nbsp;|&nbsp; ` +
+    `Pendentes: <strong>${filtered.filter(r=>r.status==='Pendente').length}</strong> &nbsp;|&nbsp; ` +
+    `Emitido em: <strong>${new Date().toLocaleString('pt-BR')}</strong>`;
+
+  setTimeout(() => window.print(), 100);
+}
+</script>
+</body>
+</html>
